@@ -12,6 +12,8 @@ public class DroneMission {
     private final double payloadWeight;
     private final boolean enableThermalImaging;
     private final boolean autoReturnHome;
+    private final double windSpeed;
+    private final boolean isRaining;
 
     private DroneMission(Builder builder) {
         this.missionId = builder.missionId;
@@ -24,6 +26,9 @@ public class DroneMission {
         this.payloadWeight = builder.payloadWeight;
         this.enableThermalImaging = builder.enableThermalImaging;
         this.autoReturnHome = builder.autoReturnHome;
+        this.windSpeed = builder.windSpeed;
+        this.isRaining = builder.isRaining;
+
     }
 
     // getters
@@ -37,6 +42,9 @@ public class DroneMission {
     public double getPayloadWeight() { return payloadWeight; }
     public boolean isEnableThermalImaging() { return enableThermalImaging; }
     public boolean isAutoReturnHome() { return autoReturnHome; }
+    public double getWindSpeed() { return windSpeed; }
+    public boolean isRaining() { return isRaining; }
+
 
     public static class Builder {
         // main
@@ -52,6 +60,8 @@ public class DroneMission {
         private double payloadWeight = 0.0;
         private boolean enableThermalImaging = false;
         private boolean autoReturnHome = true;
+        private double windSpeed = 0.0;
+        private boolean isRaining = false;
 
         public Builder(String missionId, String droneId) {
             this.missionId = missionId;
@@ -97,6 +107,14 @@ public class DroneMission {
             this.autoReturnHome = autoReturnHome;
             return this;
         }
+        public Builder windSpeed(double windSpeed) {
+            this.windSpeed = windSpeed;
+            return this;
+        }
+        public Builder withRain(boolean isRaining) {
+            this.isRaining = isRaining;
+            return this;
+        }
 
         public DroneMission build() {
             // validation
@@ -122,6 +140,22 @@ public class DroneMission {
             if (enableThermalImaging && payloadWeight < 1.5) {
                 throw new IllegalStateException("Thermal imaging camera requires carrying capacity of at least 1.5kg.");
             }
+            // new weather rule
+            // super strong wind 15m/s >
+            if (windSpeed > 15.0) {
+                throw new IllegalStateException("Mission aborted: Wind speed is too high (" + windSpeed + " m/s). Safe limit is 15 m/s.");
+            }
+
+            // 2. strong wind , 8 m/s > -  high 200
+            if (windSpeed > 8.0 && maxFlightAltitude > 200.0) {
+                throw new IllegalStateException("Mission aborted: High wind (" + windSpeed + " m/s) limits flight altitude to 200m.");
+            }
+
+            // 3. if raining weight under 1 kg
+            if (isRaining && payloadWeight > 1.0) {
+                throw new IllegalStateException("Mission aborted: Cannot carry heavy payload (>1.0kg) during rain.");
+            }
+
 
             return new DroneMission(this);
         }
