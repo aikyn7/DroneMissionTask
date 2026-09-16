@@ -16,13 +16,16 @@ public class DroneMissionGUI extends JFrame {
     private JCheckBox chkThermal;
     private JCheckBox chkAutoReturn;
     private JComboBox<String> comboCamera;
-
-    // presets choose
     private JComboBox<String> comboPresets;
+
+    // components to work with weather
+    private JLabel lblWeatherStatus;
+    private double currentFetchedWind = 0.0;
+    private boolean currentFetchedRain = false;
 
     public DroneMissionGUI() {
         setTitle("Drone Mission Constructor (Builder Pattern)");
-        setSize(500, 600);
+        setSize(520, 680);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
@@ -32,8 +35,8 @@ public class DroneMissionGUI extends JFrame {
         lblTitle.setFont(new Font("Arial", Font.BOLD, 18));
         add(lblTitle, BorderLayout.NORTH);
 
-        // panel form
-        JPanel panelForm = new JPanel(new GridLayout(12, 2, 5, 5));
+        // main panel
+        JPanel panelForm = new JPanel(new GridLayout(14, 2, 5, 5));
         panelForm.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
         panelForm.add(new JLabel("Mission ID:"));
@@ -51,6 +54,16 @@ public class DroneMissionGUI extends JFrame {
         panelForm.add(new JLabel("Longitude:"));
         txtLon = new JTextField("76.889709");
         panelForm.add(txtLon);
+
+        // open weather block
+        JButton btnFetchWeather = new JButton("Get OpenWeather");
+        btnFetchWeather.setBackground(new Color(230, 240, 250));
+        panelForm.add(btnFetchWeather);
+
+        lblWeatherStatus = new JLabel("Wind: -- m/s | Rain: --", SwingConstants.LEFT);
+        lblWeatherStatus.setFont(new Font("Arial", Font.BOLD, 12));
+        lblWeatherStatus.setForeground(new Color(30, 100, 180));
+        panelForm.add(lblWeatherStatus);
 
         panelForm.add(new JLabel("Max Altitude (m):"));
         txtAltitude = new JTextField("300.0");
@@ -78,14 +91,13 @@ public class DroneMissionGUI extends JFrame {
         chkAutoReturn = new JCheckBox("Auto Return Home", true);
         panelForm.add(chkAutoReturn);
 
-        // presets
         panelForm.add(new JLabel("Quick Preset (Director):"));
         comboPresets = new JComboBox<>(new String[]{"Custom", "SAFE Preset", "SURVEILLANCE Preset", "DELIVERY Preset"});
         panelForm.add(comboPresets);
 
         add(panelForm, BorderLayout.CENTER);
 
-        // buttons
+        // control buttons
         JPanel panelButtons = new JPanel(new FlowLayout());
         JButton btnBuild = new JButton("Build Mission (Builder)");
         btnBuild.setFont(new Font("Arial", Font.BOLD, 14));
@@ -95,16 +107,38 @@ public class DroneMissionGUI extends JFrame {
         panelButtons.add(btnBuild);
         add(panelButtons, BorderLayout.SOUTH);
 
-        // director
+        // events
+        btnFetchWeather.addActionListener(e -> fetchWeather());
         comboPresets.addActionListener(e -> applyPreset());
 
-        // build
         btnBuild.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
                 buildMissionFromForm();
             }
         });
+
+        // load weather start
+        fetchWeather();
+    }
+
+    private void fetchWeather() {
+        try {
+            double lat = Double.parseDouble(txtLat.getText());
+            double lon = Double.parseDouble(txtLon.getText());
+
+            // request current weather from openweather
+            currentFetchedWind = WeatherService.getWindSpeed(lat, lon);
+            currentFetchedRain = false; // Базовое значение осадков
+
+            lblWeatherStatus.setText(String.format("Wind: %.1f m/s | Rain: %s",
+                    currentFetchedWind, (currentFetchedRain ? "YES" : "NO")));
+            lblWeatherStatus.setForeground(currentFetchedWind > 15.0 ? Color.RED : new Color(30, 120, 50));
+
+        } catch (Exception ex) {
+            lblWeatherStatus.setText("Weather API Error");
+            lblWeatherStatus.setForeground(Color.RED);
+        }
     }
 
     private void applyPreset() {
@@ -144,7 +178,7 @@ public class DroneMissionGUI extends JFrame {
 
             Coordinates coords = new Coordinates(lat, lon);
 
-            // using builder from gui
+            // transfer weather data to builder
             DroneMission mission = new DroneMission.Builder(missionId, droneId)
                     .targetCoordinates(coords)
                     .maxFlightAltitude(alt)
@@ -154,29 +188,28 @@ public class DroneMissionGUI extends JFrame {
                     .withGps(chkGps.isSelected())
                     .withThermalImaging(chkThermal.isSelected())
                     .withAutoReturnHome(chkAutoReturn.isSelected())
+                    .windSpeed(currentFetchedWind) // Погода отправляется в Builder!
+                    .withRain(currentFetchedRain)
                     .build();
 
-            // if mission creater without problem with validation
             JOptionPane.showMessageDialog(this,
                     "Mission Successfully Created! 🍌\n" +
                             "Mission ID: " + mission.getMissionId() + "\n" +
                             "Drone ID: " + mission.getDroneId() + "\n" +
+                            "Live Wind Speed: " + mission.getWindSpeed() + " m/s\n" +
                             "Altitude: " + mission.getMaxFlightAltitude() + "m\n" +
                             "Battery: " + mission.getBatteryCapacity() + "%\n" +
                             "Thermal Imaging: " + (mission.isEnableThermalImaging() ? "YES" : "NO"),
                     "Success", JOptionPane.INFORMATION_MESSAGE);
 
         } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Please enter valid numerical values for Coordinates, Altitude, Battery, and Payload.", "Input Error", JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Please enter valid numerical values.", "Input Error", JOptionPane.ERROR_MESSAGE);
         } catch (IllegalArgumentException | IllegalStateException ex) {
-            // error handling from builder
             JOptionPane.showMessageDialog(this, "Builder Validation Failed:\n" + ex.getMessage(), "Validation Error", JOptionPane.WARNING_MESSAGE);
         }
     }
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            new DroneMissionGUI().setVisible(true);
-        });
+        SwingUtilities.invokeLater(() -> new DroneMissionGUI().setVisible(true));
     }
 }
