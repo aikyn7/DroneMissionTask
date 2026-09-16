@@ -117,47 +117,44 @@ public class DroneMission {
         }
 
         public DroneMission build() {
-            // validation
-
-            // single field rules
+            // singlefield
             if (missionId == null || missionId.isBlank()) {
                 throw new IllegalArgumentException("Mission ID cannot be empty");
             }
             if (targetCoordinates == null) {
                 throw new IllegalArgumentException("Target coordinates are required");
             }
-            if (maxFlightAltitude <= 0 || maxFlightAltitude > 5000) {
-                throw new IllegalArgumentException("Altitude must be between 1 and 5000 meters");
+
+            //latitude -90..90, longtitude -180..180 validation
+            if (targetCoordinates.getLatitude() < -90 || targetCoordinates.getLatitude() > 90 ||
+                    targetCoordinates.getLongitude() < -180 || targetCoordinates.getLongitude() > 180) {
+                throw new IllegalArgumentException("Invalid GPS coordinates! Latitude must be [-90, 90], Longitude must be [-180, 180].");
             }
 
-            //cross field
-            // misiion >1000м gps and battery >= 80%
-            if (maxFlightAltitude > 1000 && (!enableGps || batteryCapacity < 80)) {
-                throw new IllegalStateException("High-altitude missions (>1000m) require GPS and at least 80% battery.");
+            // altitude validation
+            if (maxFlightAltitude <= 0 || maxFlightAltitude > 3000) {
+                throw new IllegalArgumentException("Altitude must be between 1 and 3000 meters.");
             }
 
-            // using thermal vision requires weight under 1,5kg
+            // max weight of drone
+            if (payloadWeight < 0 || payloadWeight > 5.0) {
+                throw new IllegalArgumentException("Payload weight exceeds drone capacity (max 5.0 kg).");
+            }
+
+            // cross field
+
+            // every mission high than 500m requires gps on and battery > 80
+            if (maxFlightAltitude >= 500.0 && (!enableGps || batteryCapacity < 80)) {
+                throw new IllegalStateException("High-altitude missions (>=500m) REQUIRE enabled GPS and at least 80% battery capacity!");
+            }
+
+            // thermal vision requires weight under 1.5kg
             if (enableThermalImaging && payloadWeight < 1.5) {
                 throw new IllegalStateException("Thermal imaging camera requires carrying capacity of at least 1.5kg.");
             }
-            // new weather rule
-            // super strong wind 15m/s >
-            if (windSpeed > 15.0) {
-                throw new IllegalStateException("Mission aborted: Wind speed is too high (" + windSpeed + " m/s). Safe limit is 15 m/s.");
-            }
-
-            // 2. strong wind , 8 m/s > -  high 200
-            if (windSpeed > 8.0 && maxFlightAltitude > 200.0) {
-                throw new IllegalStateException("Mission aborted: High wind (" + windSpeed + " m/s) limits flight altitude to 200m.");
-            }
-
-            // 3. if raining weight under 1 kg
-            if (isRaining && payloadWeight > 1.0) {
-                throw new IllegalStateException("Mission aborted: Cannot carry heavy payload (>1.0kg) during rain.");
-            }
-
 
             return new DroneMission(this);
+
         }
     }
 }
